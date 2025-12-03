@@ -9,11 +9,30 @@ const useCartStore = create((set, get) => ({
   fetchCart: async () => {
     set({ isLoading: true });
     try {
+      console.log('🔄 Fetching cart...');
       const response = await cartApi.getCart();
-      set({ cart: response.data, cartCount: response.data.length, isLoading: false });
+      console.log('✅ Cart API Response:', response);
+      console.log('📦 Cart Data:', response.data);
+      
+      // ✅ Backend trả về { items: [...], total: ... }
+      const cartData = Array.isArray(response.data?.items) 
+        ? response.data.items 
+        : Array.isArray(response.data) 
+        ? response.data 
+        : [];
+      
+      console.log('🛒 Final Cart Array:', cartData);
+      
+      set({ 
+        cart: cartData, 
+        cartCount: cartData.length, 
+        isLoading: false 
+      });
     } catch (error) {
-      set({ isLoading: false });
-      console.error('Fetch cart error:', error);
+      console.error('❌ Fetch cart error:', error);
+      console.error('📄 Error details:', error.response?.data);
+      console.error('🔢 Error status:', error.response?.status);
+      set({ isLoading: false, cart: [], cartCount: 0 });
     }
   },
 
@@ -55,9 +74,17 @@ const useCartStore = create((set, get) => ({
 
   getTotalAmount: () => {
     const { cart } = get();
+    // ✅ FIX: Kiểm tra cart là array trước khi dùng reduce
+    if (!Array.isArray(cart) || cart.length === 0) {
+      return 0;
+    }
+    
     return cart.reduce((total, item) => {
+      // ✅ Kiểm tra item.course tồn tại
+      if (!item.course) return total;
+      
       const price = item.course.discount_price || item.course.price;
-      return total + parseFloat(price);
+      return total + parseFloat(price || 0);
     }, 0);
   },
 }));

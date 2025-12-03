@@ -8,7 +8,8 @@ const CourseCard = ({ course, isEnrolled = false }) => {
   const { addToCart, cart } = useCart();
   const [isAdding, setIsAdding] = useState(false);
   
-  const isInCart = cart.some(item => item.course_id === course.id);
+  // ✅ FIX: Kiểm tra cart là array trước khi dùng .some()
+  const isInCart = Array.isArray(cart) && cart.some(item => item.course_id === course.id);
   const discount = calculateDiscount(course.price, course.discount_price);
 
   const handleAddToCart = async (e) => {
