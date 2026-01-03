@@ -54,4 +54,41 @@ const courseApi = {
   },
 };
 
+// Add these methods to your existing courseApi.js file
+
+// Get lessons by course ID
+export const getLessonsByCourse = async (courseId) => {
+  try {
+    const response = await api.get(`/lessons/course/${courseId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching lessons:', error);
+    throw error;
+  }
+};
+
+// Mark lesson as completed
+export const markLessonComplete = async (courseId, lessonId) => {
+  try {
+    const response = await api.post(`/progress/complete`, {
+      course_id: courseId,
+      lesson_id: lessonId
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error marking lesson complete:', error);
+    throw error;
+  }
+};
+
+// Get user progress for a course
+export const getUserProgress = async (courseId) => {
+  try {
+    const response = await api.get(`/progress/course/${courseId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching progress:', error);
+    throw error;
+  }
+};
 export default courseApi;

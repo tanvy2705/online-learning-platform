@@ -29,11 +29,15 @@ export const PAYMENT_STATUS = {
   FAILED: 'failed',
 };
 
+// Updated to match Backend constants
 export const PAYMENT_METHODS = {
-  VNPAY: 'vnpay',
-  MOMO: 'momo',
-  PAYPAL: 'paypal',
-  VISA: 'visa',
+  VNPAY: 'vnpay',           // ✅ Backend supports (newly added)
+  MOMO: 'momo',             // ✅ Backend supports
+  MANUAL_TRANSFER: 'manual_transfer',  // ✅ Backend supports
+  // Note: PayPal and VISA are not supported by backend yet
+  // Uncomment when backend adds support:
+  // PAYPAL: 'paypal',
+  // VISA_MASTER: 'visa_master',
 };
 
 export const NOTIFICATION_TYPES = {
@@ -54,8 +58,6 @@ export const TASK_STATUS = {
   COMPLETED: 'completed',
 };
 
-
-
 export const ROUTES = {
   HOME: '/',
   LOGIN: '/login',
@@ -66,7 +68,9 @@ export const ROUTES = {
   COURSE_DETAIL: '/courses/:id',
   CART: '/cart',
   CHECKOUT: '/checkout',
-  PAYMENT_RESULT: '/payment-result',
+  PAYMENT_SUCCESS: '/payment-success',  // ← New route
+  PAYMENT_FAILED: '/payment-failed',    // ← New route
+  PAYMENT_RESULT: '/payment-result',    // ← Keep for backward compatibility
   NOTIFICATIONS: '/notifications',
   ADMIN_DASHBOARD: '/admin',
   ADMIN_COURSES: '/admin/courses',

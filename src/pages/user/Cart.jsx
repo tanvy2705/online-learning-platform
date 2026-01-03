@@ -63,7 +63,7 @@ const Cart = () => {
                   style={{ animationDelay: `${index * 0.1}s` }}
                 >
                   <img
-                    src={item.course.thumbnail || 'https://via.placeholder.com/200x120'}
+                    src={item.course.thumbnail ? `http://localhost:8000${item.course.thumbnail}` : 'https://via.placeholder.com/200x120'}
                     alt={item.course.title}
                     className="w-32 h-20 object-cover rounded-lg flex-shrink-0"
                   />

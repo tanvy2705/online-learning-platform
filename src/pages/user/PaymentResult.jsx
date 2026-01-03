@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
-import paymentApi from '../../api/paymentApi';
 import { useCart } from '../../context/CartContext';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { ROUTES } from '../../utils/constants';
@@ -13,36 +12,69 @@ const PaymentResult = () => {
   const [paymentData, setPaymentData] = useState(null);
 
   useEffect(() => {
-    const handlePaymentCallback = async () => {
+    const processPaymentResult = () => {
+      // VNPay và MoMo redirect về backend trước
+      // Backend xử lý và redirect về đây với URL params
       const params = Object.fromEntries(searchParams);
       
-      try {
-        const response = await paymentApi.handlePaymentCallback(params);
-        setPaymentData(response.data);
+      console.log('📊 Payment result params:', params);
+
+      // Check if it's a success or failed result based on URL params
+      // Backend sẽ redirect về:
+      // - Success: /payment-result?orderId=XXX&amount=XXX&transactionNo=XXX
+      // - Failed: /payment-result?orderId=XXX&code=XX&message=XXX
+
+      const orderId = params.orderId;
+      const amount = params.amount;
+      const transactionNo = params.transactionNo;
+      const errorCode = params.code;
+      const errorMessage = params.message;
+
+      if (transactionNo || amount) {
+        // Success case
+        setStatus('success');
+        setPaymentData({
+          transaction_code: orderId,
+          transaction_no: transactionNo,
+          amount: parseFloat(amount),
+          payment_method: 'vnpay',
+          created_at: new Date().toISOString()
+        });
         
-        if (response.data.status === 'success') {
-          setStatus('success');
-          clearCart();
-        } else if (response.data.status === 'failed') {
-          setStatus('failed');
-        } else {
-          setStatus('pending');
-        }
-      } catch (error) {
+        // Clear cart on success
+        clearCart();
+        
+        console.log('✅ Payment successful');
+      } else if (errorCode || errorMessage) {
+        // Failed case
         setStatus('failed');
-        console.error('Payment callback error:', error);
+        setPaymentData({
+          error_message: decodeURIComponent(errorMessage || 'Thanh toán thất bại'),
+          error_code: errorCode
+        });
+        
+        console.log('❌ Payment failed:', errorCode, errorMessage);
+      } else {
+        // Pending or unknown
+        setStatus('pending');
+        console.log('⏳ Payment pending');
       }
     };
 
-    handlePaymentCallback();
-  }, [searchParams]);
+    // Small delay to show loading state
+    const timer = setTimeout(() => {
+      processPaymentResult();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchParams, clearCart]);
 
   const renderContent = () => {
     switch (status) {
       case 'loading':
         return (
           <div className="text-center">
-            <div className="spinner mx-auto mb-4"></div>
+            <div className="spinner mx-auto mb-4 w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             <h2 className="text-2xl font-bold mb-2">Đang xử lý thanh toán...</h2>
             <p className="text-gray-600">Vui lòng đợi trong giây lát</p>
           </div>
@@ -63,16 +95,26 @@ const PaymentResult = () => {
               <div className="bg-light-gray rounded-lg p-6 mb-8 text-left max-w-md mx-auto">
                 <h3 className="font-semibold text-lg mb-4">Thông tin thanh toán</h3>
                 <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Mã giao dịch:</span>
-                    <span className="font-medium">{paymentData.transaction_code}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Số tiền:</span>
-                    <span className="font-medium text-success">
-                      {formatCurrency(paymentData.amount)}
-                    </span>
-                  </div>
+                  {paymentData.transaction_code && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Mã đơn hàng:</span>
+                      <span className="font-medium">{paymentData.transaction_code}</span>
+                    </div>
+                  )}
+                  {paymentData.transaction_no && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Mã giao dịch:</span>
+                      <span className="font-medium">{paymentData.transaction_no}</span>
+                    </div>
+                  )}
+                  {paymentData.amount && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Số tiền:</span>
+                      <span className="font-medium text-success">
+                        {formatCurrency(paymentData.amount)}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-gray-600">Phương thức:</span>
                     <span className="font-medium uppercase">{paymentData.payment_method}</span>
@@ -110,17 +152,20 @@ const PaymentResult = () => {
             </p>
 
             {paymentData?.error_message && (
-              <div className="bg-red-50 text-error rounded-lg p-4 mb-8 max-w-md mx-auto">
-                <p className="text-sm">{paymentData.error_message}</p>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-8 max-w-md mx-auto">
+                <p className="text-sm text-error">{paymentData.error_message}</p>
+                {paymentData.error_code && (
+                  <p className="text-xs text-gray-500 mt-2">Mã lỗi: {paymentData.error_code}</p>
+                )}
               </div>
             )}
 
             <div className="flex gap-4 justify-center">
-              <Link to={ROUTES.CART} className="btn btn-primary">
-                Quay lại giỏ hàng
+              <Link to={ROUTES.CHECKOUT} className="btn btn-primary">
+                Thử lại
               </Link>
-              <Link to={ROUTES.COURSES} className="btn btn-outline">
-                Tiếp tục mua sắm
+              <Link to={ROUTES.CART} className="btn btn-outline">
+                Quay lại giỏ hàng
               </Link>
             </div>
           </div>
@@ -141,8 +186,8 @@ const PaymentResult = () => {
               <Link to={ROUTES.HOME} className="btn btn-primary">
                 Về trang chủ
               </Link>
-              <Link to="/payment-history" className="btn btn-outline">
-                Lịch sử giao dịch
+              <Link to="/notifications" className="btn btn-outline">
+                Xem thông báo
               </Link>
             </div>
           </div>

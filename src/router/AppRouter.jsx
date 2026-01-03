@@ -15,6 +15,7 @@ import VerifyEmail from '../pages/auth/VerifyEmail';
 import Home from '../pages/user/Home';
 import Courses from '../pages/user/Courses';
 import CourseDetail from '../pages/user/CourseDetail';
+import Learning from '../pages/user/Learning';
 import Cart from '../pages/user/Cart';
 import Checkout from '../pages/user/Checkout';
 import PaymentResult from '../pages/user/PaymentResult';
@@ -56,6 +57,12 @@ const AppRouter = () => {
           <Route path={ROUTES.COURSES} element={<Courses />} />
           <Route path="/courses/:id" element={<CourseDetail />} />
           
+          <Route path="/learning/:courseId" element={
+            <ProtectedRoute>
+              <Learning />
+            </ProtectedRoute>
+          } />
+          
           <Route path={ROUTES.CART} element={
             <ProtectedRoute>
               <Cart />
@@ -68,11 +75,10 @@ const AppRouter = () => {
             </ProtectedRoute>
           } />
 
-          <Route path={ROUTES.PAYMENT_RESULT} element={
-            <ProtectedRoute>
-              <PaymentResult />
-            </ProtectedRoute>
-          } />
+          {/* Payment result routes - Support multiple URLs */}
+          <Route path="/payment-success" element={<PaymentResult />} />
+          <Route path="/payment-failed" element={<PaymentResult />} />
+          <Route path={ROUTES.PAYMENT_RESULT} element={<PaymentResult />} />
 
           <Route path={ROUTES.NOTIFICATIONS} element={
             <ProtectedRoute>
@@ -114,7 +120,7 @@ const AppRouter = () => {
             <StaffLayout />
           </ProtectedRoute>
         }>
-          
+        
           <Route index element={<StaffDashboard />} />
           <Route path="enrollments" element={<ManageEnrollments />} />
           <Route path="support" element={<SupportUsers />} />

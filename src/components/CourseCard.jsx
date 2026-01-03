@@ -34,7 +34,7 @@ const CourseCard = ({ course, isEnrolled = false }) => {
     >
       <div className="relative overflow-hidden rounded-lg mb-4">
         <img 
-          src={course.thumbnail || 'https://via.placeholder.com/400x250'}
+          src={course.thumbnail ? `http://localhost:8000${course.thumbnail}` : 'https://via.placeholder.com/400x250'}
           alt={course.title}
           className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500"
         />

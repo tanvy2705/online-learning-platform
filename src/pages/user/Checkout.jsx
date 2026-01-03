@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CreditCard, Tag } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
+import useAuth from '../../hooks/useAuth';
 import usePromotionStore from '../../store/usePromotionStore';
 import paymentApi from '../../api/paymentApi';
 import { formatCurrency } from '../../utils/formatCurrency';
@@ -9,9 +10,11 @@ import { PAYMENT_METHODS } from '../../utils/constants';
 
 const Checkout = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { cart, getTotalAmount, clearCart } = useCart();
   const { validatePromoCode, appliedPromo, clearAppliedPromo } = usePromotionStore();
   
+  // Default to VNPay
   const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS.VNPAY);
   const [promoCode, setPromoCode] = useState('');
   const [isValidating, setIsValidating] = useState(false);
@@ -19,10 +22,17 @@ const Checkout = () => {
   const [promoError, setPromoError] = useState('');
 
   useEffect(() => {
+    // Kiểm tra đăng nhập
+    if (!user) {
+      alert('Vui lòng đăng nhập để thanh toán!');
+      navigate('/login', { state: { from: '/checkout' } });
+      return;
+    }
+
     if (cart.length === 0) {
       navigate('/cart');
     }
-  }, [cart, navigate]);
+  }, [cart, navigate, user]);
 
   const baseAmount = getTotalAmount();
   const discountAmount = appliedPromo 
@@ -49,31 +59,100 @@ const Checkout = () => {
     setIsProcessing(true);
 
     try {
+      // Kiểm tra giỏ hàng trước
+      if (cart.length === 0) {
+        alert('Giỏ hàng trống!');
+        navigate('/cart');
+        return;
+      }
+
+      console.log('🛒 Starting payment process...');
+      console.log('💳 Payment method:', paymentMethod);
+      
+      // Bước 1: Tạo order từ cart
       const orderResponse = await paymentApi.createOrder({
-        course_ids: cart.map(item => item.course_id),
-        promo_code: appliedPromo?.code,
-        total_amount: finalAmount,
+        promo_code: appliedPromo?.code
       });
 
+      console.log('✅ Order response:', orderResponse);
+
+      if (!orderResponse.data || !orderResponse.data.order_id) {
+        throw new Error('Không nhận được thông tin đơn hàng');
+      }
+
+      const orderId = orderResponse.data.order_id;
+
+      // Bước 2: Lấy payment URL
       const paymentResponse = await paymentApi.getPaymentUrl(
-        orderResponse.data.id,
+        orderId,
         paymentMethod
       );
 
-      if (paymentResponse.data.payment_url) {
-        window.location.href = paymentResponse.data.payment_url;
+      console.log('✅ Payment response:', paymentResponse);
+
+      // Bước 3: Xử lý theo từng payment method
+      if (paymentMethod === PAYMENT_METHODS.VNPAY || paymentMethod === PAYMENT_METHODS.MOMO) {
+        // Redirect đến cổng thanh toán VNPay/MoMo
+        if (paymentResponse.data && paymentResponse.data.payment_url) {
+          console.log('🔄 Redirecting to payment gateway...');
+          window.location.href = paymentResponse.data.payment_url;
+        } else {
+          throw new Error('Không nhận được payment URL');
+        }
+      } else if (paymentMethod === PAYMENT_METHODS.MANUAL_TRANSFER) {
+        // Chuyển sang trang upload bill
+        navigate('/upload-transfer-bill', { 
+          state: { 
+            orderId,
+            transferInfo: paymentResponse.data.transfer_info 
+          } 
+        });
+      } else {
+        throw new Error('Phương thức thanh toán không được hỗ trợ');
       }
     } catch (error) {
-      alert('Có lỗi xảy ra khi xử lý thanh toán');
+      console.error('❌ Payment error:', error);
+      
+      // Xử lý lỗi 401 - chưa đăng nhập
+      if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+        alert('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại!');
+        navigate('/login', { state: { from: '/checkout' } });
+        return;
+      }
+      
+      // Xử lý lỗi giỏ hàng trống
+      if (error.message.includes('Cart is empty')) {
+        alert('Giỏ hàng trống. Vui lòng thêm khóa học vào giỏ hàng!');
+        navigate('/cart');
+        return;
+      }
+      
+      // Xử lý lỗi khác
+      alert(error.message || 'Có lỗi xảy ra khi xử lý thanh toán. Vui lòng thử lại!');
       setIsProcessing(false);
     }
   };
 
+  // Payment methods - chỉ hiển thị những cái được backend hỗ trợ
   const paymentMethods = [
-    { id: PAYMENT_METHODS.VNPAY, name: 'VNPAY', logo: '🏦' },
-    { id: PAYMENT_METHODS.MOMO, name: 'Momo', logo: '💳' },
-    { id: PAYMENT_METHODS.PAYPAL, name: 'PayPal', logo: '💰' },
-    { id: PAYMENT_METHODS.VISA, name: 'VISA/Master', logo: '💳' },
+    { 
+      id: PAYMENT_METHODS.VNPAY, 
+      name: 'VNPay', 
+      logo: '🏦',
+      description: 'Thanh toán qua VNPay (ATM, Visa, MasterCard)'
+    },
+    { 
+      id: PAYMENT_METHODS.MOMO, 
+      name: 'MoMo', 
+      logo: '💳',
+      description: 'Ví điện tử MoMo'
+    },
+    { 
+      id: PAYMENT_METHODS.MANUAL_TRANSFER, 
+      name: 'Chuyển khoản', 
+      logo: '🏧',
+      description: 'Chuyển khoản ngân hàng thủ công'
+    },
   ];
 
   return (
@@ -89,19 +168,36 @@ const Checkout = () => {
                 Phương thức thanh toán
               </h2>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3">
                 {paymentMethods.map((method) => (
                   <button
                     key={method.id}
                     onClick={() => setPaymentMethod(method.id)}
-                    className={`p-4 border-2 rounded-lg transition-all ${
+                    className={`w-full p-4 border-2 rounded-lg transition-all text-left ${
                       paymentMethod === method.id
                         ? 'border-primary bg-primary/5'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
+                    aria-label={`Chọn phương thức ${method.name}`}
                   >
-                    <div className="text-3xl mb-2">{method.logo}</div>
-                    <div className="font-medium">{method.name}</div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-3xl">{method.logo}</div>
+                      <div className="flex-1">
+                        <div className="font-medium text-lg">{method.name}</div>
+                        <div className="text-sm text-gray-600">{method.description}</div>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 ${
+                        paymentMethod === method.id 
+                          ? 'border-primary bg-primary' 
+                          : 'border-gray-300'
+                      }`}>
+                        {paymentMethod === method.id && (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </button>
                 ))}
               </div>
@@ -198,7 +294,10 @@ const Checkout = () => {
                 className="btn btn-primary w-full"
               >
                 {isProcessing ? (
-                  <div className="spinner w-5 h-5 mx-auto"></div>
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="spinner w-5 h-5"></div>
+                    <span>Đang xử lý...</span>
+                  </div>
                 ) : (
                   'Thanh toán ngay'
                 )}
